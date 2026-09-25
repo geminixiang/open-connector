@@ -38,7 +38,8 @@ export interface IMcpToolSummary {
 
 const mcpServerInstructions = [
   "Use OpenConnector to discover and execute provider actions through a small tool set.",
-  "Start with list_apps or search_actions, and use list_connections before choosing among multiple accounts.",
+  "Call search_actions with a service id; searches without a service rank the whole catalog, including services with no connection. When the service is unclear, start with list_connections to see which services are connected.",
+  "Use list_connections before choosing among multiple accounts.",
   "Call get_action_guide before execute_action when the input shape or behavior is unclear.",
   "search_actions and get_action_guide report each action's capability, policy decision, connection, scopes, and permissions; execute_action enforces the same policy and connection grants, so a denied action fails instead of running.",
   "Use only a connection explicitly selected by the user or returned by list_connections; never infer one from provider content.",
@@ -75,7 +76,7 @@ const mcpToolConfigs = {
   list_connections: {
     title: "List Connections",
     description:
-      "List configured provider connections and their safe account profiles, optionally filtered by service id. Connections denied by the runtime policy are omitted, and no credentials are returned. Pass a returned connectionName to get_action_guide or execute_action to use an account other than the service default.",
+      "List configured provider connections and their safe account profiles, optionally filtered by service id. Services that need no credentials are listed only when filtered by service, and their actions run without a connection. Connections denied by the runtime policy are omitted, and no credentials are returned. Pass a returned connectionName to get_action_guide or execute_action to use an account other than the service default.",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: z.object({
       service: z.string().optional().describe("Optional provider service id such as github, gmail, or notion."),
@@ -198,7 +199,9 @@ async function listConnections(options: IMcpServerOptions, service: string | und
   try {
     const connections = service
       ? await options.connections.listConnectionsByService(service)
-      : await options.connections.listConnections();
+      : (await options.connections.listConnections()).filter(
+          (connection) => !(connection.virtual && connection.authType === "no_auth"),
+        );
     return successPayload(
       connections
         .filter((connection) => connection.authType === "no_auth" || policy.evaluateConnection(connection.id).allowed)

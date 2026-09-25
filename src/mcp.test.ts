@@ -128,7 +128,9 @@ describe("MCP server", () => {
       const instructions = client.getInstructions();
 
       expect(instructions).toBeTypeOf("string");
-      expect(instructions).toContain("use list_connections before choosing among multiple accounts");
+      expect(instructions).toContain("Call search_actions with a service id");
+      expect(instructions).toContain("start with list_connections");
+      expect(instructions).toContain("Use list_connections before choosing among multiple accounts");
       expect(instructions).toContain("Call get_action_guide before execute_action");
     });
   });
@@ -223,6 +225,19 @@ describe("MCP server", () => {
         ],
       });
       expect(JSON.stringify(result.structuredContent)).not.toContain("test-token");
+    });
+  });
+
+  it("lists virtual no-auth connections only when filtered by service", async () => {
+    await withMcpClient(async (client) => {
+      const all = await client.callTool({ name: "list_connections", arguments: {} });
+      const filtered = await client.callTool({ name: "list_connections", arguments: { service: "example" } });
+
+      expect(all.structuredContent).toEqual({ ok: true, data: [] });
+      expect(filtered.structuredContent).toMatchObject({
+        ok: true,
+        data: [{ service: "example", authType: "no_auth", connectionName: "default" }],
+      });
     });
   });
 
