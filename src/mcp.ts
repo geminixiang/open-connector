@@ -2,7 +2,7 @@ import type { CatalogStore, RuntimeActionDefinition } from "./catalog-store.ts";
 import type { ConnectionService, ConnectionSummary } from "./connection-service.ts";
 import type { ActionPolicyDecision, ActionPolicySnapshot } from "./core/action-policy.ts";
 import type { ActionSearchIndexProvider } from "./core/action-search.ts";
-import type { AuthType, JsonSchema } from "./core/types.ts";
+import type { AuthType, CredentialProfile, JsonSchema } from "./core/types.ts";
 import type { ActionRunner, ActionRunResult } from "./server/actions/action-runner.ts";
 import type { RuntimeGrant } from "./server/storage/runtime-token-service.ts";
 import type { CallToolResult } from "@modelcontextprotocol/server";
@@ -84,7 +84,7 @@ const mcpToolConfigs = {
   search_actions: {
     title: "Search Actions",
     description:
-      "Search catalog actions by free-text query, optionally limited to one provider service id. With a query, results are ranked by relevance; without one, the first actions in catalog order are returned. Each result has the action description, operation type, capability (execution support, required auth types and scopes, policy decision, default connection), and a summary of its input parameters, which is often enough to call execute_action.",
+      "Search catalog actions by free-text query, optionally limited to one provider service id. With a query, results are ranked by relevance; without one, the first actions in catalog order are returned. Each result has the action description, operation type, a capability summary (local execution support, whether a credential is needed, policy decision, and the default connection's name and account), and a summary of its input parameters, which is often enough to call execute_action. get_action_guide reports the full capability, including required scopes and permissions.",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: z.object({
       query: z
@@ -95,7 +95,7 @@ const mcpToolConfigs = {
         .string()
         .optional()
         .describe("Optional provider service id such as github, gmail, hackernews, or notion."),
-      limit: z.number().int().min(1).max(50).default(20).describe("Maximum number of actions to return."),
+      limit: z.number().int().min(1).max(50).default(10).describe("Maximum number of actions to return."),
     }),
   },
   get_action_guide: {
@@ -272,10 +272,8 @@ async function searchActions(
     name: action.name,
     description: action.description,
     operationType: action.operationType,
-    capability: describeActionCapability(
-      action,
-      policy,
-      await getSelectedConnectionSummary(options, action.service, undefined),
+    capability: summarizeActionCapability(
+      describeActionCapability(action, policy, await getSelectedConnectionSummary(options, action.service, undefined)),
     ),
     inputSummary: summarizeInputSchema(action.inputSchema),
   }));
@@ -412,6 +410,28 @@ function describeActionCapability(
     providerPermissions: action.providerPermissions,
     policy: policy.evaluate(action),
     connection: evaluateConnectionGrant(policy, connection).allowed ? connection : undefined,
+  };
+}
+
+interface ActionCapabilitySummary {
+  execution: Pick<RuntimeActionDefinition["execution"], "locallyExecutable" | "needsCredential">;
+  policy: ActionPolicyDecision;
+  connection?: Pick<ConnectionSummary, "connectionName"> & {
+    profile: Pick<CredentialProfile, "accountId" | "displayName">;
+  };
+}
+
+function summarizeActionCapability(capability: ActionCapability): ActionCapabilitySummary {
+  const { execution, policy, connection } = capability;
+  return {
+    execution: { locallyExecutable: execution.locallyExecutable, needsCredential: execution.needsCredential },
+    policy,
+    connection: connection
+      ? {
+          connectionName: connection.connectionName,
+          profile: { accountId: connection.profile.accountId, displayName: connection.profile.displayName },
+        }
+      : undefined,
   };
 }
 
