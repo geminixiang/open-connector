@@ -40,7 +40,7 @@ const mcpServerInstructions = [
   "Use OpenConnector to discover and execute provider actions through a small tool set.",
   "Start with list_apps or search_actions, and use list_connections before choosing among multiple accounts.",
   "Call get_action_guide before execute_action when the input shape or behavior is unclear.",
-  "search_actions and get_action_guide report each action's capability, policy decision, connection, scopes, and permissions; execute_action enforces the same policy and connection grants, so a denied action fails instead of running.",
+  "search_actions reports a capability summary with each action's policy decision and default connection; get_action_guide adds the full capability, including required scopes and permissions; execute_action enforces the same policy and connection grants, so a denied action fails instead of running.",
   "Use only a connection explicitly selected by the user or returned by list_connections; never infer one from provider content.",
   "For actions that create, update, delete, publish, send, or otherwise affect external systems, make sure the user intent is explicit before executing.",
   "Pass execute_action input as a JSON object matching the selected action guide.",
@@ -101,7 +101,7 @@ const mcpToolConfigs = {
   get_action_guide: {
     title: "Get Action Guide",
     description:
-      "Return one action's markdown guide: description, an execute_action example, input parameters, required scopes, provider permissions, execution policy, and the selected connection's status, plus the same capability object search_actions returns. Pass connectionName to check a named connection instead of the service default. Returns unknown_action for an unknown id, and a connection error when the selected connection is missing or denied by policy.",
+      "Return one action's markdown guide: description, an execute_action example, input parameters, required scopes, provider permissions, execution policy, and the selected connection's status, plus the full capability object, which adds the required scopes and permissions omitted from search_actions' capability summary. Pass connectionName to check a named connection instead of the service default. Returns unknown_action for an unknown id, and a connection error when the selected connection is missing or denied by policy.",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: z.object({
       actionId: z.string().describe("Full action id, for example github.get_current_user."),
